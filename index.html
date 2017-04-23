@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>SQL Search and Replace Tool (for MySQL, PostgreSQL, MariaDB etc.)</title>
+	<link rel="stylesheet" type="text/css" href="lib/bootstrap.min.css">
+	
+	<style type="text/css" media="screen">
+		html {
+			height: 100%;
+			font-size: 87%;
+		}
+		body {
+			display: flex;
+			flex-direction: column;
+			min-height: 100%;
+		}
+		a {
+			text-decoration: underline;
+			color: #76797c;
+		}
+		header {
+			margin-bottom: 10px;
+		}
+		main {
+			display: flex;
+			flex-direction: row;
+			flex-grow: 1;
+		}
+		main .left {
+			margin-right: 20px;
+			width: 140%;
+		}
+		.replacements .form-control {
+			margin-right: 5px;
+			margin-bottom: 5px;
+		}
+		main .right {
+			display: flex;
+			flex-direction: column;
+		}
+		main .right textarea {
+			flex-grow: 1;
+			font-family: monospace;
+		}
+		footer {
+			background-color: #ddd;
+			padding-top: 8px;
+			padding-bottom: 8px;
+			margin-top: 15px;
+			font-size: 93%;
+		}
+		footer .left {
+			float: left;
+		}
+		footer .right {
+			float: right;
+		}
+	</style>
+	
+	<!-- Yump Analytics -->
+	<script data-cfasync="false">(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+	new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+	j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+	'//www.googletagmanager.com/gtm.'+'js?id='+i+dl;f.parentNode.insertBefore(j,f);
+	})(window,document,'script','dataLayer','GTM-W68LXQ');</script>
+</head>
+<body>
+
+<header>
+	<nav class="navbar navbar-toggleable-md navbar-inverse bg-inverse">
+	  <!-- <button class="navbar-toggler navbar-toggler-right" type="button" data-toggle="collapse" data-target="#navbarNavAltMarkup" aria-controls="navbarNavAltMarkup" aria-expanded="false" aria-label="Toggle navigation">
+	    <span class="navbar-toggler-icon"></span>
+	  </button> -->
+	  <span class="navbar-brand" href="#">SQL Search and Replace Tool</span>
+	  <div class="collapse navbar-collapse" id="navbarNavAltMarkup">
+	    <div class="navbar-nav">
+	      <!-- <a class="nav-item nav-link active" href="#">Home <span class="sr-only">(current)</span></a>
+	      <a class="nav-item nav-link" href="#">Features</a>
+	      <a class="nav-item nav-link" href="#">Pricing</a>
+	      <a class="nav-item nav-link disabled" href="#">Disabled</a> -->
+	    </div>
+	  </div>
+	</nav>
+</header>
+
+<script src="lib/vue.min.js"></script>
+
+<main id="app" class="container-fluid">
+
+	<div class="left">
+	
+		<div>Which tables and fields need to be searched? <span class="text-muted">(one per line)</span></div>
+		<textarea class="form-control" style="margin-bottom: 10px" placeholder="table.fieldA" v-model="fields"></textarea>
+		
+		<div>Which terms need replacing?</div>
+		<div class="replacements" style="display: flex" v-for="(replacement, index) in replacements">
+			<input type="text" class="form-control" placeholder="search term" v-model="replacement.search">
+			<input type="text" class="form-control" placeholder="replacement" v-model="replacement.replace">
+			<button type="button" class="close" aria-label="Close"  title="Remove this line" @click="remove(index)">
+			  &times;
+			</button>
+		</div>
+		
+		<a href="#" title="" @click="replacements.push({search: '', replace: ''})">Add</a>
+	</div>
+	
+	<div class="right">
+		<div class="intro">
+			<p>Ever needed to replace one or more strings inside your database? You can use this tool to generate a search-and-replace script SQL in a few seconds.</p>
+		</div>
+		<textarea class="form-control">{{ sql() }}</textarea>
+	</div>
+	
+</main>
+
+<script>
+	new Vue({
+		el: '#app',
+		
+		// Data model
+		data: {
+			fields: '',
+			replacements: [
+				{search: '', replace: ''},
+				{search: '', replace: ''},
+			]
+		},
+		
+		methods: {
+			
+			/**
+			 * Main function for generating the SQL script
+			 */
+			sql: function() {
+				var fields = this.fields.trim().split(/\s*\n\s*/);
+				var replacements = this.replacements.filter(function(item){
+					return item.search;
+				});
+				
+				if (!fields || !replacements) 
+					return;
+				
+				var sql = '';
+				
+				// Create one SQL UPDATE statement per field
+				fields.forEach(function(item, i){
+					
+					// Skip empty items
+					if (!item)
+						return;
+					
+					// Get the table and field name separately
+					item = item.split('.');
+					var table = item[0],
+						field = item[1];
+					
+					// We start with the field name
+					fieldSql = '`' + field + '`';
+					conditionSql = [];
+					
+					replacements.forEach(function(r){
+						
+						// Wrap it in a replace statement
+						// REPLACE('string', 'a', 'b')
+						// making sure we escape single quotes
+						fieldSql = 
+							'REPLACE(' 
+							+ fieldSql 
+							+ ', \'' 
+							+ r.search.replace(/'/g, "\\'") 
+							+ '\', \'' 
+							+ r.replace.replace(/'/g, "\\'") 
+							+ '\')';
+						
+						// Add term to the search condition
+						// `field` LIKE '%searchterm%'
+						// making sure we escape single quotes
+						conditionSql.push('`' + field + '` LIKE \'%'
+							+ r.search.replace(/'/g, "\\'") 
+							+ '%\'')
+					});
+					
+					// Bundle final SQL together
+					// UPDATE `table` SET `field` = REPLACE(...)
+					// WHERE `field` LIKE '%search1%' OR `field` LIKE '%search2%';
+					sql += 'UPDATE `' + table + '` \nSET `' 
+						+ field + '` = ' + fieldSql 
+						+ '\nWHERE ' + conditionSql.join(' OR ') + ';\n\n';
+					
+					// sql += fieldSql;
+				});
+				return sql;
+			},
+			
+			/**
+			 * Removes a search+replace pair from the list
+			 */
+			remove: function(index) {
+				this.replacements.splice(index, 1);
+			}
+		}
+	})
+</script>
+
+<footer class="clearfix">
+	<div class="container-fluid small text-muted">
+		<div class="left">Made with ❤️ by <a href="https://twitter.com/SimoEast">@SimoEast</a>. <a href="">View on Github</a>. <a href="">Report a bug</a>.</div>
+		<div class="right">Proudly supported by <a href="https://yump.com.au/">Yump.com.au Digital Agency Melbourne</a></div>
+	</div>
+</footer>
+
+</body>
+</html>
