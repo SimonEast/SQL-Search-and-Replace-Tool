@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-	<title>SQL Search and Replace Tool (for MySQL, PostgreSQL, MariaDB etc.)</title>
+	<title>SQL Search and Replace Tool (for MySQL, PostgreSQL, MariaDB, SQL Server etc.)</title>
 	<link rel="stylesheet" type="text/css" href="lib/bootstrap.min.css">
 	
 	<style type="text/css" media="screen">
@@ -89,10 +89,10 @@
 
 	<div class="left">
 	
-		<div>Which tables and fields need to be searched? <span class="text-muted">(one per line)</span></div>
+		<label>Which tables and fields need to be searched? <span class="text-muted">(one per line)</span></label>
 		<textarea class="form-control" style="margin-bottom: 10px" placeholder="table.fieldA" v-model="fields"></textarea>
 		
-		<div>Which terms need replacing?</div>
+		<label>Which terms need replacing? <span class="text-muted">(case-sensitive)</span></label>
 		<div class="replacements" style="display: flex" v-for="(replacement, index) in replacements">
 			<input type="text" class="form-control" placeholder="search term" v-model="replacement.search">
 			<input type="text" class="form-control" placeholder="replacement" v-model="replacement.replace">
