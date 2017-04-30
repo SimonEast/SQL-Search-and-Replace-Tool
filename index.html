@@ -117,7 +117,7 @@
 	new Vue({
 		el: '#app',
 		
-		// Data model
+		// Data model, with default values
 		data: {
 			fields: '',
 			replacements: [
@@ -132,6 +132,7 @@
 			 * Main function for generating the SQL script
 			 */
 			sql: function() {
+				var me = this;
 				var fields = this.fields.trim().split(/\s*\n\s*/);
 				var replacements = this.replacements.filter(function(item){
 					return item.search;
@@ -155,7 +156,7 @@
 						field = item[1];
 					
 					// We start with the field name
-					fieldSql = '`' + field + '`';
+					fieldSql = me.escapeTableOrField(field);
 					conditionSql = [];
 					
 					replacements.forEach(function(r){
@@ -175,7 +176,7 @@
 						// Add term to the search condition
 						// `field` LIKE '%searchterm%'
 						// making sure we escape single quotes
-						conditionSql.push('`' + field + '` LIKE \'%'
+						conditionSql.push(me.escapeTableOrField(field) + ' LIKE \'%'
 							+ r.search.replace(/'/g, "\\'") 
 							+ '%\'')
 					});
@@ -183,13 +184,22 @@
 					// Bundle final SQL together
 					// UPDATE `table` SET `field` = REPLACE(...)
 					// WHERE `field` LIKE '%search1%' OR `field` LIKE '%search2%';
-					sql += 'UPDATE `' + table + '` \nSET `' 
-						+ field + '` = ' + fieldSql 
+					sql += 'UPDATE ' + me.escapeTableOrField(table) + ' \nSET ' 
+						+ me.escapeTableOrField(field) + ' = ' + fieldSql 
 						+ '\nWHERE ' + conditionSql.join(' OR ') + ';\n\n';
 					
 					// sql += fieldSql;
 				});
 				return sql;
+			},
+			
+			/**
+			 * Encloses a table or field name in delimeters and escapes it
+			 * 
+			 * (Not used currently as different databases use different delimiters. Possibly in a future version.)
+			 */
+			escapeTableOrField: function(identifier) {
+				return identifier;
 			},
 			
 			/**
